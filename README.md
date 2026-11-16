@@ -21,7 +21,7 @@ All Codex calls go through `agents/codex-shim`, which:
 - maps `--full-auto` (removed in Codex 0.169, still passed by Dream-RSI) to `-s workspace-write`;
 - closes stdin, because `codex exec` blocks on a non-TTY stdin.
 
-**Leakage controls.** The agent's workspace is a snapshot of `base_commit` with a fresh one-commit git history, because upstream history contains the actual fix. Hidden tests are applied only at scoring time, on a scratch copy. The Codex sandbox blocks the network.
+**Leakage controls.** The agent's workspace is a snapshot of `base_commit` with a fresh one-commit git history, because upstream history contains the actual fix. Hidden tests are applied only at scoring time, on a scratch copy. The agent runs in Codex's `workspace-write` sandbox, where network access is off by default (not separately tested here).
 
 ## Benchmark: SWE-rebench slice
 
