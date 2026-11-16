@@ -7,7 +7,17 @@ Compares two recursive self-improvement methods on the same benchmark, with the 
 
 Both are pinned as submodules under `vendor/`.
 
-## Setup
+## Quick start
+
+```bash
+codex login        # once, with a ChatGPT plan that includes Codex
+bash setup.sh      # envs, submodules, sqlglot mirror, task validation (no Codex calls)
+bash run.sh        # all arms + results table; ≈280 Codex sessions
+```
+
+`bash run.sh compare` rebuilds the table from existing runs only. Requirements: git, [uv](https://docs.astral.sh/uv/), Node.js, bash ≥ 4 (macOS: `brew install bash`). Docker is not needed.
+
+## Design
 
 | Role | Dream-RSI | Harness² |
 |---|---|---|
@@ -32,14 +42,7 @@ All Codex calls go through `agents/codex-shim`, which:
 - **Hidden tests** give Dream-RSI a numeric evaluator and give the final measurement for both methods. Harness² never sees them.
 - **Graded score:** the fraction of `FAIL_TO_PASS` tests that pass, gated on all `PASS_TO_PASS` tests passing.
 
-`bench/validate.py` keeps only tasks where `FAIL_TO_PASS` fails at `base_commit` and everything passes with the gold patch. It runs on macOS without Docker: sqlglot is pure Python, so the tests run in a shared uv venv.
-
-```bash
-uv venv --python 3.13 .venv-tests
-uv pip install --python .venv-tests/bin/python pytest pytz duckdb numpy pandas
-git clone https://github.com/tobymao/sqlglot /tmp/hp-data/sqlglot
-.venv-tests/bin/python bench/validate.py       # -> bench/tasks.jsonl
-```
+`bench/validate.py` keeps only tasks where `FAIL_TO_PASS` fails at `base_commit` and everything passes with the gold patch. It runs on macOS without Docker: sqlglot is pure Python, so the tests run in a shared uv venv. `setup.sh` runs it.
 
 ## Plan
 

@@ -7,7 +7,7 @@
 #   bash arms/dream_arm.sh [TASK_ID ...]      # default: every task in bench/tasks.jsonl
 set -euo pipefail
 HP="$(cd "$(dirname "$0")/.." && pwd)"
-BASH5=/opt/homebrew/bin/bash
+BASH5="${BASH5:-$(command -v bash)}"   # needs bash >= 4 (macOS: brew install bash)
 S="$HP/adapters/dream_rsi_swe/scripts"
 
 export PYTHON="$HP/.venv-dream/bin/python"

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-MIRRORS = Path(os.environ.get("HP_MIRRORS", "/tmp/hp-data"))
+MIRRORS = Path(os.environ.get("HP_MIRRORS", str(ROOT.parent / "data")))
 PYTHON = os.environ.get("HP_TEST_PYTHON", str(ROOT.parent / ".venv-tests" / "bin" / "python"))
 
 
