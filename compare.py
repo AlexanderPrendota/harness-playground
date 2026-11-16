@@ -7,6 +7,7 @@ Per task, with the same solver (Codex gpt-6-luna) and hidden-test scoring:
   DR-fixed   E0 + one more round with the fixed policy (RFE baseline), 8 rollouts
   DR-learned E0 + one round with the policy learned by dreaming, <= 8 rollouts
   H2-base    Harness² reference executions with the base harness (k = 2 rollouts)
+  best3      plain best-of-3 by hidden tests, no learning: the single run + the 2 H2 base runs
   H2         Harness² deliverable: the blindly selected final, after 4k = 8 rollouts
 
 Dream-RSI reports the best score found (it queries the hidden tests while searching).
@@ -63,7 +64,8 @@ def harness2(task: str) -> dict:
         d = json.loads(f.read_text())
         scores[d["run_id"].rsplit("/", 1)[-1]] = d
     base = [scores[k]["score"] for k in sorted(scores) if k.startswith("base")]
-    out = {"base_mean": sum(base) / len(base) if base else None, "rollouts": len(scores)}
+    out = {"base_mean": sum(base) / len(base) if base else None, "base_best": max(base, default=None),
+           "rollouts": len(scores)}
     if sums:
         sel = json.loads(sums[0].read_text()).get("selections", {}).get("agg", {})
         lbl = sel.get("chosen_label")
@@ -87,20 +89,23 @@ if __name__ == "__main__":
         rows.append({"task": t.instance_id, "single": single(t.instance_id),
                      "dream": dream(t.instance_id), "harness2": harness2(t.instance_id)})
     (ROOT / "runs" / ("compare-claude.json" if CLAUDE else "compare.json")).write_text(json.dumps(rows, indent=1))
-    hdr = "| task | single | DR-E0 (4) | DR-fixed (8) | DR-learned | H2-base | H2 final (8) | H2 best rollout |"
+    hdr = ("| task | single | best3 (plain) | DR-E0 (4) | DR-fixed (8) | DR-learned | H2-base | H2 final (8) "
+           "| H2 best rollout |")
     print(hdr)
-    print("|---|---|---|---|---|---|---|---|")
-    tot = {k: [] for k in ("single", "e0", "fixed", "learned", "h2b", "h2")}
+    print("|---|---|---|---|---|---|---|---|---|")
+    tot = {k: [] for k in ("single", "best3", "e0", "fixed", "learned", "h2b", "h2")}
     for r in rows:
         d, h = r["dream"], r["harness2"]
-        print(f"| {r['task'].split('-')[-1]} | {fmt(r['single'])} | {fmt(d['e0_best'])} | {fmt(d['fixed_best'])} | "
+        b3 = None if r["single"] is None else max([r["single"]] + ([h["base_best"]] if h.get("base_best") is not None else []))
+        r["best3"] = b3
+        print(f"| {r['task'].split('-')[-1]} | {fmt(r['single'])} | {fmt(b3)} | {fmt(d['e0_best'])} | {fmt(d['fixed_best'])} | "
               f"{fmt(d['learned_best'])} ({d['learned_rollouts']}) | {fmt(h.get('base_mean'))} | "
               f"{fmt(h.get('final'))} | {fmt(h.get('any_rollout'))} |")
-        for k, v in (("single", r["single"]), ("e0", d["e0_best"]), ("fixed", d["fixed_best"]),
+        for k, v in (("single", r["single"]), ("best3", b3), ("e0", d["e0_best"]), ("fixed", d["fixed_best"]),
                      ("learned", d["learned_best"]), ("h2b", h.get("base_mean")), ("h2", h.get("final"))):
             if v is not None:
                 tot[k].append(v)
     solved = lambda xs: f"{sum(x == 1.0 for x in xs)}/{len(xs)}" if xs else "–"
-    print(f"| **resolved** | {solved(tot['single'])} | {solved(tot['e0'])} | {solved(tot['fixed'])} | "
+    print(f"| **resolved** | {solved(tot['single'])} | {solved(tot['best3'])} | {solved(tot['e0'])} | {solved(tot['fixed'])} | "
           f"{solved(tot['learned'])} | {fmt(sum(tot['h2b']) / len(tot['h2b'])) if tot['h2b'] else '–'} (mean) | "
           f"{solved(tot['h2'])} | |")
