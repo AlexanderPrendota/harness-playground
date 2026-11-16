@@ -33,7 +33,7 @@ def solve(task, out: Path) -> dict:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", nargs="*")
-    ap.add_argument("--out", default=str(ROOT / "runs" / "single"))
+    ap.add_argument("--out", default=str(ROOT / "runs" / ("claude/single" if codex_run.AGENT == "claude" else "single")))
     a = ap.parse_args()
     for task in swe.load():
         if a.tasks and task.instance_id not in a.tasks:

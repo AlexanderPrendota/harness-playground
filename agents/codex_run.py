@@ -1,15 +1,21 @@
-"""Run Codex headless in a workspace and record usage. Used by every arm."""
+"""Run the solver headless in a workspace and record usage. Used by every arm.
+
+HP_AGENT=codex (default) uses Codex; HP_AGENT=claude uses Claude Code through
+`agents/claude-shim`, which speaks the same `codex exec` interface.
+"""
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SHIM = ROOT / "agents" / "codex-shim"
-MODEL = "gpt-6-luna"
+AGENT = os.environ.get("HP_AGENT", "codex")
+SHIM = ROOT / "agents" / ("claude-shim" if AGENT == "claude" else "codex-shim")
+MODEL = os.environ.get("HP_CLAUDE_MODEL", "claude-sonnet-5-5") if AGENT == "claude" else "gpt-6-luna"
 
 
 def task_prompt(task, python: str) -> str:
@@ -38,7 +44,8 @@ def run(workspace: Path, prompt: str, log_dir: Path, *, timeout: int = 1800) -> 
         out, code = (exc.stdout or b"").decode() if isinstance(exc.stdout, bytes) else (exc.stdout or ""), -1
     wall = time.time() - t0
     (log_dir / "events.jsonl").write_text(out)
-    usage = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0, "reasoning_output_tokens": 0}
+    usage = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0, "reasoning_output_tokens": 0,
+             "cost_usd": 0.0}
     commands = 0
     for line in out.splitlines():
         try:
@@ -48,6 +55,7 @@ def run(workspace: Path, prompt: str, log_dir: Path, *, timeout: int = 1800) -> 
         if ev.get("type") == "turn.completed":
             for k in usage:
                 usage[k] += ev.get("usage", {}).get(k, 0) or 0
+            usage["cost_usd"] += ev.get("total_cost_usd", 0.0) or 0.0
         elif ev.get("type") == "item.completed" and ev.get("item", {}).get("type") == "command_execution":
             commands += 1
     return {"exit": code, "wall_s": round(wall, 1), "commands": commands, **usage}

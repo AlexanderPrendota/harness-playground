@@ -53,6 +53,14 @@ All Codex calls go through `agents/codex-shim`, which:
 - [x] Runs: Dream-RSI (`arms/dream_arm.sh`) and Harness² (`arms/harness2_arm.py --k 2`), 8 Codex rollouts per task each
 - [x] `compare.py`: results table
 
+## Replication on Claude Code
+
+`HP_AGENT=claude` swaps every Codex call for Claude Code through `agents/claude-shim`, which speaks the `codex exec` interface. Model `claude-sonnet-5-5`, effort low. User hooks, plugins and MCP are excluded (`--setting-sources project,local --strict-mcp-config`), and the web tools are disabled. For Harness², the Codex harness layout is mapped onto Claude Code's at execution: AGENTS.md → CLAUDE.md, `.agents/skills` → `.claude/skills`, hooks → `.claude/settings.json`.
+
+```bash
+HP_AGENT=claude bash run.sh
+```
+
 ## macOS notes
 
 - Dream-RSI scripts need bash ≥ 4 (`brew install bash`).

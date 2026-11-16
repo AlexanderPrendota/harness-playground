@@ -12,7 +12,10 @@ S="$HP/adapters/dream_rsi_swe/scripts"
 
 export PYTHON="$HP/.venv-dream/bin/python"
 export DRSI_EVAL_PYTHON="$HP/.venv-tests/bin/python"
-export AGENT=codex CODEX_BIN="$HP/agents/codex-shim" CODEX_MODEL=gpt-6-luna CODEX_EXEC_TIMEOUT_SEC=1800
+# HP_AGENT=claude swaps the solver/improver for Claude Code via a codex-compatible shim.
+if [ "${HP_AGENT:-codex}" = claude ]; then SHIM="$HP/agents/claude-shim"; W_DEFAULT="$HP/workspace/claude/dream"
+else SHIM="$HP/agents/codex-shim"; W_DEFAULT="$HP/workspace/dream"; fi
+export AGENT=codex CODEX_BIN="$SHIM" CODEX_MODEL=gpt-6-luna CODEX_EXEC_TIMEOUT_SEC=1800
 export ROUNDS=2 BRANCHES=2 REFINE=1 MAX_WORKERS=2 EVAL_TIMEOUT=900
 
 tasks=("$@")
@@ -23,7 +26,7 @@ fi
 for t in "${tasks[@]}"; do
   echo "=== $t"
   "$DRSI_EVAL_PYTHON" "$HP/adapters/dream_rsi_swe/make_task.py" "$t" >/dev/null
-  W="$HP/workspace/dream"
+  W="${HP_DREAM_WS:-$W_DEFAULT}"
   [ -f "$W/e0/$t/live_cycle_manifest.json" ] || WORKSPACE="$W/e0/$t" "$BASH5" "$S/run_e0.sh" "$t"
   E0_WORKSPACE="$W/e0/$t" WORKSPACE="$W/dream_rsi/$t" "$BASH5" "$S/run_dream_rsi.sh" "$t" > "$W/$t.dream.log" 2>&1 &
   E0_WORKSPACE="$W/e0/$t" WORKSPACE="$W/baseline/$t" "$BASH5" "$S/run_baseline.sh" "$t" > "$W/$t.baseline.log" 2>&1 &

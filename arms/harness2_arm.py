@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "adapters"), str(ROOT / "bench")]
+sys.path[:0] = [str(ROOT / "adapters"), str(ROOT / "bench"), str(ROOT / "agents")]
 import swe  # noqa: E402
 from harness2_swe import CodexProposer, SWEAdapter  # noqa: E402
 
@@ -22,7 +22,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--k", type=int, default=2)
     ap.add_argument("--tasks", nargs="*")
-    ap.add_argument("--out", default=str(ROOT / "runs" / "harness2"))
+    import codex_run
+    ap.add_argument("--out", default=str(ROOT / "runs" / ("claude/harness2" if codex_run.AGENT == "claude" else "harness2")))
     a = ap.parse_args()
     tasks = [t for t in swe.load() if not a.tasks or t.instance_id in a.tasks]
     root = Path(a.out).resolve()

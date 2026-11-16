@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""`codex exec`-compatible front end for Claude Code, so every arm can switch agents with
+HP_AGENT=claude and nothing else changes.
+
+Accepts the codex flags the arms use (-C dir, -m, -o last_message, --json, -s, --full-auto,
+--skip-git-repo-check; the prompt is the last positional) and runs:
+
+    claude -p --model $HP_CLAUDE_MODEL --effort $HP_CLAUDE_EFFORT --output-format stream-json
+           --setting-sources project,local --strict-mcp-config   (no user hooks/plugins/MCP)
+           --permission-mode bypassPermissions --disallowedTools WebFetch WebSearch
+
+stdout is translated to codex-style JSON events (command_execution, file_change,
+agent_message, turn.completed with usage), so trajectory and token accounting are shared.
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+MODEL = os.environ.get("HP_CLAUDE_MODEL", "claude-sonnet-5-5")
+EFFORT = os.environ.get("HP_CLAUDE_EFFORT", "low")
+
+
+def parse(argv):
+    if argv[:1] != ["exec"]:
+        argv = [a for a in argv if a != "--full-auto"]
+    args = argv[1:] if argv[:1] == ["exec"] else argv
+    if "--help" in args:
+        print("claude-shim: codex-exec compatible wrapper around Claude Code")
+        sys.exit(0)
+    cwd, last, rest, i = os.getcwd(), None, [], 0
+    while i < len(args):
+        a = args[i]
+        if a in ("-C", "--cd"):
+            cwd = args[i + 1]; i += 2
+        elif a in ("-o", "--output-last-message"):
+            last = args[i + 1]; i += 2
+        elif a in ("-m", "--model", "-s", "--sandbox", "-c", "--config"):
+            i += 2
+        elif a.startswith("-"):
+            i += 1
+        else:
+            rest.append(a); i += 1
+    return cwd, last, rest[-1] if rest else sys.stdin.read()
+
+
+def emit(ev):
+    print(json.dumps(ev), flush=True)
+
+
+def main():
+    cwd, last, prompt = parse(sys.argv[1:])
+    cmd = ["claude", "-p", "--model", MODEL, "--effort", EFFORT, "--output-format", "stream-json",
+           "--verbose", "--setting-sources", "project,local", "--strict-mcp-config",
+           "--permission-mode", "bypassPermissions", "--disallowedTools", "WebFetch", "WebSearch"]
+    proc = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
+    proc.stdin.write(prompt); proc.stdin.close()
+    pending, final = {}, None
+    emit({"type": "turn.started"})
+    for line in proc.stdout:
+        try:
+            m = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if m.get("type") == "assistant":
+            for b in m.get("message", {}).get("content", []):
+                if b.get("type") == "tool_use":
+                    pending[b["id"]] = b
+                elif b.get("type") == "text" and b.get("text", "").strip():
+                    emit({"type": "item.completed", "item": {"type": "agent_message", "text": b["text"]}})
+        elif m.get("type") == "user":
+            for b in m.get("message", {}).get("content", []) if isinstance(m.get("message", {}).get("content"), list) else []:
+                if b.get("type") != "tool_result" or b.get("tool_use_id") not in pending:
+                    continue
+                use = pending.pop(b["tool_use_id"])
+                out = b.get("content")
+                out = "".join(c.get("text", "") for c in out) if isinstance(out, list) else str(out or "")
+                name, inp = use.get("name"), use.get("input", {})
+                if name == "Bash":
+                    item = {"type": "command_execution", "command": inp.get("command", ""),
+                            "aggregated_output": out[:20000], "exit_code": 1 if b.get("is_error") else 0}
+                elif name in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+                    item = {"type": "file_change", "changes": [{"path": inp.get("file_path", ""), "kind": name}]}
+                else:
+                    item = {"type": "command_execution", "command": f"{name} {json.dumps(inp)[:300]}",
+                            "aggregated_output": out[:4000], "exit_code": 1 if b.get("is_error") else 0}
+                emit({"type": "item.completed", "item": item})
+        elif m.get("type") == "result":
+            final = m
+    proc.wait()
+    if final is None:
+        emit({"type": "error", "message": (proc.stderr.read() or "no result")[-500:]})
+        sys.exit(proc.returncode or 1)
+    u = final.get("usage", {})
+    cached = u.get("cache_read_input_tokens", 0) or 0
+    emit({"type": "turn.completed", "usage": {
+        "input_tokens": (u.get("input_tokens", 0) or 0) + cached + (u.get("cache_creation_input_tokens", 0) or 0),
+        "cached_input_tokens": cached, "output_tokens": u.get("output_tokens", 0) or 0,
+        "reasoning_output_tokens": 0}, "total_cost_usd": final.get("total_cost_usd", 0.0)})
+    if last:
+        with open(last, "w") as f:
+            f.write(final.get("result") or "")
+    sys.exit(1 if final.get("is_error") else 0)
+
+
+if __name__ == "__main__":
+    main()

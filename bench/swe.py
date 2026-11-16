@@ -13,6 +13,7 @@ score(task, workdir) -> dict with:
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -63,8 +64,11 @@ def checkout(task: Task, dest: Path | None = None) -> Path:
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
-    if _git("cat-file", "-e", f"{task.base_commit}^{{commit}}", cwd=task.mirror).returncode:
-        _git("fetch", "-q", "origin", task.base_commit, cwd=task.mirror)
+    # Arms run in parallel and share one mirror: serialize the fetch of a missing commit.
+    with open(task.mirror / ".hp-fetch.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if _git("cat-file", "-e", f"{task.base_commit}^{{commit}}", cwd=task.mirror).returncode:
+            _git("fetch", "-q", "origin", task.base_commit, cwd=task.mirror)
     archive = subprocess.run(["git", "archive", task.base_commit], cwd=task.mirror, capture_output=True)
     if archive.returncode:
         raise RuntimeError(archive.stderr.decode()[:400])

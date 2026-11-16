@@ -60,6 +60,28 @@ class CodexProposer(Proposer):
             last.unlink(missing_ok=True)
 
 
+def _to_claude_layout(wd: Path) -> None:
+    """Map the Codex harness layout onto Claude Code's: AGENTS.md -> CLAUDE.md,
+    .agents/skills -> .claude/skills, .codex/hooks.json -> .claude/settings.json (same hook
+    schema), sub_agents/<n>/AGENT.md -> .claude/agents/<n>.md. The editors keep working on
+    the Codex layout, so both agents share one harness surface. As with Codex, the harness's
+    instruction file replaces any AGENTS.md/CLAUDE.md the repository ships."""
+    if (wd / "AGENTS.md").is_file():
+        dst = wd / "CLAUDE.md"
+        if dst.is_symlink() or dst.exists():  # some repos ship CLAUDE.md -> AGENTS.md
+            dst.unlink()
+        shutil.copy2(wd / "AGENTS.md", dst)
+    if (wd / ".agents" / "skills").is_dir():
+        shutil.copytree(wd / ".agents" / "skills", wd / ".claude" / "skills", dirs_exist_ok=True)
+    hooks = wd / ".codex" / "hooks.json"
+    if hooks.is_file():
+        (wd / ".claude").mkdir(exist_ok=True)
+        (wd / ".claude" / "settings.json").write_text(hooks.read_text())
+    for agent in (wd / "sub_agents").glob("*/AGENT.md"):
+        (wd / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(agent, wd / ".claude" / "agents" / f"{agent.parent.name}.md")
+
+
 class SWEAdapter:
     def __init__(self, root: Path, tasks: list[swe.Task]):
         self.root = Path(root)
@@ -117,6 +139,8 @@ class SWEAdapter:
                     shutil.copytree(p, wd / entry, dirs_exist_ok=True)
                 elif p.is_file():
                     shutil.copy2(p, wd / entry)
+            if codex_run.AGENT == "claude":
+                _to_claude_layout(wd)
             # Commit the harness so the patch only holds the agent's change.
             swe._git("add", "-A", cwd=wd)
             swe._git("-c", "user.name=h", "-c", "user.email=h@local", "commit", "-q", "-m", "harness", cwd=wd)

@@ -23,8 +23,11 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "bench"))
 import swe  # noqa: E402
 
-W = ROOT / "workspace" / "dream"
-H2 = ROOT / "runs" / "harness2"
+import os
+CLAUDE = os.environ.get("HP_AGENT") == "claude"
+W = ROOT / "workspace" / ("claude/dream" if CLAUDE else "dream")
+H2 = ROOT / "runs" / ("claude/harness2" if CLAUDE else "harness2")
+SINGLE = ROOT / "runs" / ("claude/single" if CLAUDE else "single")
 
 
 def _scores(f: Path) -> list[float]:
@@ -70,7 +73,7 @@ def harness2(task: str) -> dict:
 
 
 def single(task: str) -> float | None:
-    f = ROOT / "runs" / "single" / task / "result.json"
+    f = SINGLE / task / "result.json"
     return json.loads(f.read_text())["score"] if f.is_file() else None
 
 
@@ -83,7 +86,7 @@ if __name__ == "__main__":
     for t in swe.load():
         rows.append({"task": t.instance_id, "single": single(t.instance_id),
                      "dream": dream(t.instance_id), "harness2": harness2(t.instance_id)})
-    (ROOT / "runs" / "compare.json").write_text(json.dumps(rows, indent=1))
+    (ROOT / "runs" / ("compare-claude.json" if CLAUDE else "compare.json")).write_text(json.dumps(rows, indent=1))
     hdr = "| task | single | DR-E0 (4) | DR-fixed (8) | DR-learned | H2-base | H2 final (8) | H2 best rollout |"
     print(hdr)
     print("|---|---|---|---|---|---|---|---|")
