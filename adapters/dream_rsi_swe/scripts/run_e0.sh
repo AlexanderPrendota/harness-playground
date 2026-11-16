@@ -1,0 +1,1 @@
+../../../vendor/dream-rsi/scripts/run_e0.sh

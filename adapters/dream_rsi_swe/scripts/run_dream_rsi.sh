@@ -1,0 +1,1 @@
+../../../vendor/dream-rsi/scripts/run_dream_rsi.sh

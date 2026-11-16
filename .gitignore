@@ -1,0 +1,9 @@
+.venv*/
+runs/
+workspace/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+results/
+RESULTS.md

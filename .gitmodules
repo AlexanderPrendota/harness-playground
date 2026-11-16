@@ -1,0 +1,6 @@
+[submodule "vendor/dream-rsi"]
+	path = vendor/dream-rsi
+	url = https://github.com/google-research/dream-rsi
+[submodule "vendor/harness2"]
+	path = vendor/harness2
+	url = https://github.com/google-research/harness2

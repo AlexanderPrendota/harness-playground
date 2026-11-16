@@ -1,0 +1,11 @@
+#!/bin/sh
+# Single entry point to Codex for every arm: isolated CODEX_HOME (no user hooks/config),
+# and `--full-auto` (removed in Codex 0.169, still passed by Dream-RSI) mapped to
+# `-s workspace-write`.
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+export CODEX_HOME="${HP_CODEX_HOME:-$HERE/runs/codex-home}"
+for a in "$@"; do
+  if [ "$a" = "--full-auto" ]; then set -- "$@" -s workspace-write; else set -- "$@" "$a"; fi
+  shift
+done
+exec codex "$@" </dev/null   # codex exec blocks reading a non-TTY stdin
