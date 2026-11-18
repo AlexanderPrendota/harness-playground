@@ -64,7 +64,7 @@ def evaluate(program_path):
     edits = list(getattr(mod, "EDITS", []))
     if not edits:
         return {{"combined_score": 0.0, "error": "EDITS is empty"}}
-    task = next(t for t in swe.load() if t.instance_id == TASK_ID)
+    task = swe.get(TASK_ID)
     wd = swe.checkout(task)
     try:
         try:
@@ -111,7 +111,6 @@ def make(task: swe.Task) -> Path:
 
 
 if __name__ == "__main__":
-    want = set(sys.argv[1:])
-    for t in swe.load():
-        if not want or t.instance_id in want:
-            print(make(t))
+    ids = sys.argv[1:] or [t.instance_id for t in swe.load()]
+    for i in ids:
+        print(make(swe.get(i)))

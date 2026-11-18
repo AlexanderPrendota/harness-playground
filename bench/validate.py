@@ -1,11 +1,13 @@
 """Keep only candidates that behave on this machine: FAIL_TO_PASS fails at base_commit and
-everything passes with the gold patch. Writes bench/tasks.jsonl.
+everything passes with the gold patch.
 
-    python bench/validate.py
+    python bench/validate.py                                   # candidates.jsonl -> tasks.jsonl
+    python bench/validate.py --src X.jsonl --dst Y.jsonl
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -13,8 +15,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import swe  # noqa: E402
 
+ap = argparse.ArgumentParser()
+ap.add_argument("--src", default=str(swe.ROOT / "candidates.jsonl"))
+ap.add_argument("--dst", default=str(swe.ROOT / "tasks.jsonl"))
+args = ap.parse_args()
+
 out = []
-for task in swe.load(swe.ROOT / "candidates.jsonl"):
+for task in swe.load(args.src):
     wd = swe.checkout(task)
     try:
         before = swe.score(task, wd)
@@ -29,7 +36,7 @@ for task in swe.load(swe.ROOT / "candidates.jsonl"):
     if valid:
         out.append(task)
 
-(swe.ROOT / "tasks.jsonl").write_text(
+Path(args.dst).write_text(
     "".join(json.dumps(t.__dict__) + "\n" for t in sorted(out, key=lambda t: t.created_at))
 )
-print(f"{len(out)} valid tasks -> bench/tasks.jsonl")
+print(f"{len(out)} valid tasks -> {args.dst}")

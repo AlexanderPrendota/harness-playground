@@ -16,11 +16,12 @@ export DRSI_EVAL_PYTHON="$HP/.venv-tests/bin/python"
 if [ "${HP_AGENT:-codex}" = claude ]; then SHIM="$HP/agents/claude-shim"; W_DEFAULT="$HP/workspace/claude/dream"
 else SHIM="$HP/agents/codex-shim"; W_DEFAULT="$HP/workspace/dream"; fi
 export AGENT=codex CODEX_BIN="$SHIM" CODEX_MODEL=gpt-6-luna CODEX_EXEC_TIMEOUT_SEC=1800
-export ROUNDS=2 BRANCHES=2 REFINE=1 MAX_WORKERS=2 EVAL_TIMEOUT=900
+export ROUNDS="${ROUNDS:-2}" BRANCHES="${BRANCHES:-2}" REFINE="${REFINE:-1}" MAX_WORKERS="${MAX_WORKERS:-2}" EVAL_TIMEOUT=900
+TASKS_FILE="${HP_TASKS_FILE:-$HP/bench/tasks.jsonl}"
 
 tasks=("$@")
 if [ ${#tasks[@]} -eq 0 ]; then
-  mapfile -t tasks < <("$DRSI_EVAL_PYTHON" -c "import json;[print(json.loads(l)['instance_id']) for l in open('$HP/bench/tasks.jsonl')]")
+  mapfile -t tasks < <("$DRSI_EVAL_PYTHON" -c "import json;[print(json.loads(l)['instance_id']) for l in open('$TASKS_FILE')]")
 fi
 
 for t in "${tasks[@]}"; do

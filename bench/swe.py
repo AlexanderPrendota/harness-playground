@@ -50,6 +50,16 @@ def load(path: Path | str = ROOT / "tasks.jsonl") -> list[Task]:
     return [Task(**json.loads(line)) for line in Path(path).read_text().splitlines() if line.strip()]
 
 
+def get(instance_id: str) -> Task:
+    """Find a task by id in any task list under bench/ (tasks.jsonl first)."""
+    files = [ROOT / "tasks.jsonl"] + sorted(f for f in ROOT.glob("*.jsonl") if f.name != "tasks.jsonl")
+    for f in files:
+        for t in load(f):
+            if t.instance_id == instance_id:
+                return t
+    raise KeyError(instance_id)
+
+
 def _git(*args: str, cwd: Path, input: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=cwd, input=input, text=True, capture_output=True)
 

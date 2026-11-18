@@ -33,9 +33,10 @@ def solve(task, out: Path) -> dict:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", nargs="*")
+    ap.add_argument("--tasks-file", default=None, help="task list (default: bench/tasks.jsonl)")
     ap.add_argument("--out", default=str(ROOT / "runs" / ("claude/single" if codex_run.AGENT == "claude" else "single")))
     a = ap.parse_args()
-    for task in swe.load():
+    for task in (swe.load(a.tasks_file) if a.tasks_file else swe.load()):
         if a.tasks and task.instance_id not in a.tasks:
             continue
         r = solve(task, Path(a.out) / task.instance_id)
