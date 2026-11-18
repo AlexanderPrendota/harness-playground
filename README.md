@@ -75,6 +75,10 @@ python arms/harness2_arm.py --k 1 --tasks-file bench/study_library.jsonl --libra
 python arms/harness2_arm.py --k 1 --tasks-file bench/study_library.jsonl --library reset --out runs/study-library/reset
 python study_compare.py library --tasks-file bench/study_library.jsonl --carry runs/study-library/carry --reset runs/study-library/reset
 
+# equal budget: 8 plain rollouts vs. 8 Harness² rollouts, both selected by hidden tests
+for r in 2 3 4 5 6 7 8; do python arms/single.py --tasks-file bench/tasks.jsonl --out runs/part4/plain-main/run$r; done
+python study_compare.py budget --tasks-file bench/tasks.jsonl --runs runs/single runs/part4/plain-main/run{2..8} --h2 runs/harness2
+
 # Dream-RSI learned vs. fixed policy on multi-test tasks, 3 rounds of 2x2
 HP_TASKS_FILE=bench/study_dream.jsonl HP_DREAM_WS=$PWD/workspace/study-dream ROUNDS=3 bash arms/dream_arm.sh
 python study_compare.py dream --tasks-file bench/study_dream.jsonl --ws workspace/study-dream

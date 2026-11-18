@@ -3,6 +3,9 @@
     python study_compare.py calib  --tasks-file F --runs runs/calib/run1 runs/calib/run2 [--extra-single runs/single]
     python study_compare.py library --tasks-file F --carry runs/h2-carry --reset runs/h2-reset
     python study_compare.py dream  --tasks-file F --ws workspace/study-dream
+    python study_compare.py budget --tasks-file F --runs DIR... --h2 runs/harness2
+        equal-budget check: plain sampling (pass@k over the given single-run dirs) vs.
+        Harness² rollouts selected by hidden tests and by its own blind selector
 """
 
 from __future__ import annotations
@@ -100,11 +103,40 @@ def dream(a) -> None:
         print(f"| {t.instance_id.split('-')[-1]} | {max(e0):.2f} | {f(L)} | {f(F)} | {tb(L)} | {tb(F)} | {promoted} promoted, {kept} kept |")
 
 
+def budget(a) -> None:
+    from math import comb
+    tasks = swe.load(a.tasks_file)
+    print("| task | plain solved / samples | H2: rollouts solved / 8 | H2 blind pick |")
+    print("|---|---|---|---|")
+    tot = {"p1": 0.0, "p4": 0.0, "p8": 0.0, "h2any": 0, "h2pick": 0, "h2roll": 0, "h2n": 0, "n": 0}
+    for t in tasks:
+        sc = [r["score"] for r in (_single(Path(d), t.instance_id) for d in a.runs) if r]
+        n, c = len(sc), sum(x == 1 for x in sc)
+        pk = lambda k: 1 - comb(n - c, k) / comb(n, k) if n >= k else None
+        h = _h2(Path(a.h2), t.instance_id)
+        rolls = h["scores"]
+        pick = rolls.get(h.get("chosen")) if h.get("chosen") else None
+        print(f"| {t.instance_id.split('-')[-1]} | {c}/{n} | {sum(v == 1 for v in rolls.values())}/{len(rolls)} | "
+              f"{'–' if pick is None else int(pick == 1)} |")
+        tot["n"] += 1
+        for k, key in ((1, "p1"), (4, "p4"), (8, "p8")):
+            v = pk(k)
+            tot[key] += v if v is not None else float("nan")
+        tot["h2any"] += any(v == 1 for v in rolls.values())
+        tot["h2pick"] += pick == 1
+        tot["h2roll"] += sum(v == 1 for v in rolls.values()); tot["h2n"] += len(rolls)
+    N = tot["n"]
+    print(f"\nExpected tasks solved by plain sampling, selected by tests: pass@1 {tot['p1']:.1f}, "
+          f"pass@4 {tot['p4']:.1f}, pass@8 {tot['p8']:.1f} (of {N})")
+    print(f"Harness², 8 rollouts: any solved (selected by tests) {tot['h2any']}/{N}; blind selection {tot['h2pick']}/{N}; "
+          f"per-rollout success {tot['h2roll']}/{tot['h2n']}")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("study", choices=("calib", "library", "dream"))
+    ap.add_argument("study", choices=("calib", "library", "dream", "budget"))
     ap.add_argument("--tasks-file", required=True)
     ap.add_argument("--runs", nargs="*", default=[])
-    ap.add_argument("--carry"); ap.add_argument("--reset"); ap.add_argument("--ws")
+    ap.add_argument("--carry"); ap.add_argument("--reset"); ap.add_argument("--ws"); ap.add_argument("--h2")
     a = ap.parse_args()
-    {"calib": calib, "library": library, "dream": dream}[a.study](a)
+    {"calib": calib, "library": library, "dream": dream, "budget": budget}[a.study](a)
